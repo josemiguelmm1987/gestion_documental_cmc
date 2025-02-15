@@ -1,0 +1,21 @@
+# Entorno virtual
+venv/
+.env/
+
+# Archivos de configuración sensible
+*.env
+*.key
+*.sqlite3
+
+# Archivos generados por Django
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de IDE
+.vscode/
+.idea/
+
+# Base de datos local
+db.sqlite3
