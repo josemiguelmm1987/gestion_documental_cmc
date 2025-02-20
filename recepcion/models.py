@@ -1,29 +1,17 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 
 # Create your models here.
 
-class Dependencia(models.Model):
-    nombre = models.CharField(max_length=255, verbose_name="Nombre de la Dependencia")
-    descripcion = models.TextField(verbose_name="Descripción", blank=True, null=True)
+class Cargo(models.Model):
+    nombre = models.CharField(max_length=255, verbose_name="Nombre del Cargo", unique=True)
 
     def __str__(self):
         return self.nombre
-
-    class Meta:
-        verbose_name = "Dependencia"
-        verbose_name_plural = "Dependencias"
-
-class Ente(models.Model):
-    nombre = models.CharField(max_length=255, verbose_name="Nombre")
-    cargo = models.CharField(max_length=255, verbose_name="Cargo", blank=True, null=True)
-    dependencia = models.ForeignKey(Dependencia, on_delete=models.CASCADE, verbose_name="Dependencia")
-
-    def __str__(self):
-        return f"{self.nombre} ({self.cargo} - {self.dependencia})"
     
     class Meta:
-        verbose_name = "Remitente/Destinatario"
-        verbose_name_plural = "Remitentes/Destinatarios"
+        verbose_name = "Cargo"
+        verbose_name_plural = "Cargos"
 
 class TipoDocumento(models.Model):
     nombre = models.CharField(max_length=255, verbose_name="Tipo de Documento", unique=True)
@@ -36,12 +24,30 @@ class TipoDocumento(models.Model):
         verbose_name = "Tipo de Documento"
         verbose_name_plural = "Tipos de Documento"
 
+class Entidad(models.Model):
+    class TipoPersona:
+        PERSONA_NATURAL = 'Persona Natural'
+        PERSONA_JURIDICA = 'Persona Jurídica'
+        choices = [
+            (PERSONA_NATURAL, 'Persona Natural'),
+            (PERSONA_JURIDICA, 'Persona Jurídica'),
+        ]
+
+    tipo_persona = models.CharField(max_length=20, choices=TipoPersona.choices)
+    nombre = models.CharField(max_length=255, verbose_name="Nombre")
+
+    def __str__(self):
+        return self.nombre
+    
+    class Meta:
+        verbose_name = "Entidad"
+        verbose_name_plural = "Entidades"
+    
+
 class Documento(models.Model):
     # Campos obligatorios
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.CASCADE, verbose_name="Tipo de Documento")
-    remitentes = models.ManyToManyField(Ente, verbose_name="Remitentes", related_name="documento_remitentes")
-    fecha_hora_recepcion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha y Hora de Recepción")
-    destinatarios = models.ManyToManyField(Ente, verbose_name="Destinatarios", related_name="documento_destinatarios")
+    fecha_hora_recepcion = models.DateTimeField(verbose_name="Fecha y Hora de Recepción")
     referencia = models.TextField(verbose_name="Referencia")
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -56,3 +62,63 @@ class Documento(models.Model):
     class Meta:
         verbose_name = "Documento"
         verbose_name_plural = "Documentos"
+
+class EntidadRemitente(models.Model):
+    documento = models.ForeignKey(Documento, on_delete=models.CASCADE, verbose_name="Documento")
+    entidad = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="entidad_remitente_documento", verbose_name="Entidad")
+    cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, verbose_name='Cargo', blank=True, null=True)  # Solo aplica si es una persona_natural
+    dependencia = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="dependencia_remitente_documento", verbose_name="Entidad", blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # Validar según el tipo de persona de la entidad
+        if self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_NATURAL:
+            # Si es Persona Natural, cargo y dependencia son obligatorios
+            if not self.cargo:
+                raise ValidationError("El campo 'cargo' es obligatorio para una Persona Natural.")
+            if not self.dependencia:
+                raise ValidationError("El campo 'dependencia' es obligatorio para una Persona Natural.")
+            # Verificar que la dependencia sea una Persona Jurídica
+            if self.dependencia and self.dependencia.tipo_persona != Entidad.TipoPersona.PERSONA_JURIDICA:
+                raise ValidationError("La 'dependencia' debe ser una Persona Jurídica para una Persona Natural.")
+
+        elif self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_JURIDICA:
+            # Si es Persona Jurídica, no se permiten cargo ni dependencia
+            if self.cargo:
+                raise ValidationError("El campo 'cargo' no debe estar definido para una Persona Jurídica.")
+            if self.dependencia:
+                raise ValidationError("El campo 'dependencia' no debe estar definido para una Persona Jurídica.")
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.entidad.nombre} - {self.documento}"
+    
+class EntidadDestinatario(models.Model):
+    documento = models.ForeignKey(Documento, on_delete=models.CASCADE, verbose_name="Documento")
+    entidad = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="entidad_destinatario_documento", verbose_name="Entidad")
+    cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, verbose_name='Cargo', blank=True, null=True)  # Solo aplica si es una persona_natural
+    dependencia = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="dependencia_destinatario_documento", verbose_name="Entidad", blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # Validar según el tipo de persona de la entidad
+        if self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_NATURAL:
+            # Si es Persona Natural, cargo y dependencia son obligatorios
+            if not self.cargo:
+                raise ValidationError("El campo 'cargo' es obligatorio para una Persona Natural.")
+            if not self.dependencia:
+                raise ValidationError("El campo 'dependencia' es obligatorio para una Persona Natural.")
+            # Verificar que la dependencia sea una Persona Jurídica
+            if self.dependencia and self.dependencia.tipo_persona != Entidad.TipoPersona.PERSONA_JURIDICA:
+                raise ValidationError("La 'dependencia' debe ser una Persona Jurídica para una Persona Natural.")
+
+        elif self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_JURIDICA:
+            # Si es Persona Jurídica, no se permiten cargo ni dependencia
+            if self.cargo:
+                raise ValidationError("El campo 'cargo' no debe estar definido para una Persona Jurídica.")
+            if self.dependencia:
+                raise ValidationError("El campo 'dependencia' no debe estar definido para una Persona Jurídica.")
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.entidad.nombre} - {self.documento}"
