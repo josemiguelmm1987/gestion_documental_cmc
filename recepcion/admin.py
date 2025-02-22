@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils import timezone
 from .models import Cargo, TipoDocumento, Entidad, Documento, EntidadRemitente, EntidadDestinatario
 
 # Registro simple para modelos sin relaciones complejas
@@ -42,11 +44,32 @@ class EntidadDestinatarioInline(admin.TabularInline):
 # Registro único para Documento con inlines
 @admin.register(Documento)
 class DocumentoAdmin(admin.ModelAdmin):
-    list_display = ('identificacion', 'tipo_documento', 'fecha_hora_recepcion', 'created', 'updated')
+    list_display = ('identificacion', 'tipo_documento', 'get_fecha_hora_recepcion', 'get_remitentes', 'referencia', 'ver_archivo')
     list_filter = ('tipo_documento', 'fecha_hora_recepcion')
     search_fields = ('identificacion', 'referencia')
     date_hierarchy = 'fecha_hora_recepcion'
     inlines = [EntidadRemitenteInline, EntidadDestinatarioInline]
+
+    # Función personalizada para formatear fecha_hora_recepcion
+    def get_fecha_hora_recepcion(self, obj):
+        return obj.fecha_hora_recepcion.strftime('%d/%m/%Y %H:%M')
+    get_fecha_hora_recepcion.short_description = 'Fecha de Recepción'
+
+    # Función para mostrar "Ver archivo" como enlace clickable
+    def ver_archivo(self, obj):
+        if obj.enlace_drive:
+            return format_html('<a href="{}" target="_blank">Ver archivo</a>', obj.enlace_drive)
+        return '-'
+    ver_archivo.short_description = 'Archivo'
+
+    # Función para mostrar los remitentes
+    def get_remitentes(self, obj):
+        remitentes = obj.entidadremitente_set.all()  # Accede a los remitentes relacionados
+        if remitentes:
+            # Concatenar los nombres de las entidades (puedes incluir cargo o dependencia si quieres)
+            return ", ".join([str(remitente.entidad) for remitente in remitentes])
+        return '-'
+    get_remitentes.short_description = 'Remitentes'
 
 # Registro individual para EntidadRemitente y EntidadDestinatario
 @admin.register(EntidadRemitente)

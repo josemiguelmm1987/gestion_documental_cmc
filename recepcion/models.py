@@ -49,12 +49,13 @@ class Documento(models.Model):
     tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.CASCADE, verbose_name="Tipo de Documento")
     fecha_hora_recepcion = models.DateTimeField(verbose_name="Fecha y Hora de Recepción")
     referencia = models.TextField(verbose_name="Referencia")
+    observaciones = models.TextField(verbose_name="Observaciones", null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
     # Campo opcional (para documentos sin identificación)
     identificacion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Identificación del Documento")
-    enlace_drive = models.URLField(max_length=500, blank=True, null=True, verbose_name="Enlace de Google Drive")
+    enlace_drive = models.URLField(max_length=500, blank=True, null=True, verbose_name="Enlace")
 
     def __str__(self):
         return f"Documento {self.id} - {self.identificacion}"
@@ -67,26 +68,27 @@ class EntidadRemitente(models.Model):
     documento = models.ForeignKey(Documento, on_delete=models.CASCADE, verbose_name="Documento")
     entidad = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="entidad_remitente_documento", verbose_name="Entidad")
     cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, verbose_name='Cargo', blank=True, null=True)  # Solo aplica si es una persona_natural
-    dependencia = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="dependencia_remitente_documento", verbose_name="Entidad", blank=True, null=True)
+    dependencia = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="dependencia_remitente_documento", verbose_name="Dependencia", blank=True, null=True)
 
     def save(self, *args, **kwargs):
         # Validar según el tipo de persona de la entidad
-        if self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_NATURAL:
-            # Si es Persona Natural, cargo y dependencia son obligatorios
-            if not self.cargo:
-                raise ValidationError("El campo 'cargo' es obligatorio para una Persona Natural.")
-            if not self.dependencia:
-                raise ValidationError("El campo 'dependencia' es obligatorio para una Persona Natural.")
-            # Verificar que la dependencia sea una Persona Jurídica
-            if self.dependencia and self.dependencia.tipo_persona != Entidad.TipoPersona.PERSONA_JURIDICA:
-                raise ValidationError("La 'dependencia' debe ser una Persona Jurídica para una Persona Natural.")
 
-        elif self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_JURIDICA:
+        if self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_JURIDICA:
             # Si es Persona Jurídica, no se permiten cargo ni dependencia
             if self.cargo:
                 raise ValidationError("El campo 'cargo' no debe estar definido para una Persona Jurídica.")
             if self.dependencia:
                 raise ValidationError("El campo 'dependencia' no debe estar definido para una Persona Jurídica.")
+        
+        # elif self.entidad.tipo_persona == Entidad.TipoPersona.PERSONA_NATURAL:
+        #     # Si es Persona Natural, cargo y dependencia son obligatorios
+        #     if not self.cargo:
+        #         raise ValidationError("El campo 'cargo' es obligatorio para una Persona Natural.")
+        #     if not self.dependencia:
+        #         raise ValidationError("El campo 'dependencia' es obligatorio para una Persona Natural.")
+        #     # Verificar que la dependencia sea una Persona Jurídica
+        #     if self.dependencia and self.dependencia.tipo_persona != Entidad.TipoPersona.PERSONA_JURIDICA:
+        #         raise ValidationError("La 'dependencia' debe ser una Persona Jurídica para una Persona Natural.")
 
         super().save(*args, **kwargs)
 
@@ -97,7 +99,7 @@ class EntidadDestinatario(models.Model):
     documento = models.ForeignKey(Documento, on_delete=models.CASCADE, verbose_name="Documento")
     entidad = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="entidad_destinatario_documento", verbose_name="Entidad")
     cargo = models.ForeignKey(Cargo, on_delete=models.CASCADE, verbose_name='Cargo', blank=True, null=True)  # Solo aplica si es una persona_natural
-    dependencia = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="dependencia_destinatario_documento", verbose_name="Entidad", blank=True, null=True)
+    dependencia = models.ForeignKey(Entidad, on_delete=models.CASCADE, related_name="dependencia_destinatario_documento", verbose_name="Dependencia", blank=True, null=True)
 
     def save(self, *args, **kwargs):
         # Validar según el tipo de persona de la entidad
