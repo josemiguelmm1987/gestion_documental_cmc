@@ -44,7 +44,7 @@ class EntidadDestinatarioInline(admin.TabularInline):
 # Registro único para Documento con inlines
 @admin.register(Documento)
 class DocumentoAdmin(admin.ModelAdmin):
-    list_display = ('identificacion', 'tipo_documento', 'get_fecha_hora_recepcion', 'get_remitentes', 'referencia', 'ver_archivo')
+    list_display = ('identificacion', 'tipo_documento', 'get_fecha_hora_recepcion', 'get_remitentes', 'referencia', 'ver_archivo', 'mostrar_qr')
     list_filter = ('tipo_documento', 'fecha_hora_recepcion')
     search_fields = ('identificacion', 'referencia')
     date_hierarchy = 'fecha_hora_recepcion'
@@ -70,6 +70,20 @@ class DocumentoAdmin(admin.ModelAdmin):
             return ", ".join([str(remitente.entidad) for remitente in remitentes])
         return '-'
     get_remitentes.short_description = 'Remitentes'
+
+    # Hacer el campo QR de solo lectura
+    readonly_fields = ('qr_code', 'mostrar_qr')
+
+    def mostrar_qr(self, obj):
+        """Método personalizado para mostrar el código QR en el admin."""
+        if obj.qr_code:
+            return format_html(
+                '<img src="{}" width="150" height="150" />',
+                obj.qr_code.url
+            )
+        return "No hay código QR generado aún."
+
+    mostrar_qr.short_description = "Código QR"  # Nombre de la columna en la lista y formulario
 
 # Registro individual para EntidadRemitente y EntidadDestinatario
 @admin.register(EntidadRemitente)

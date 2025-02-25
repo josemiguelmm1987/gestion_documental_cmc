@@ -1,5 +1,8 @@
+import os
 from django.db import models
 from django.core.exceptions import ValidationError
+import qrcode
+from django.conf import settings
 
 # Create your models here.
 
@@ -56,6 +59,54 @@ class Documento(models.Model):
     # Campo opcional (para documentos sin identificación)
     identificacion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Identificación del Documento")
     enlace_drive = models.URLField(max_length=500, blank=True, null=True, verbose_name="Enlace")
+
+    # Campo para almacenar la ruta del código QR
+    qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True, verbose_name="Código QR")
+
+    def generate_qr_code(self):
+        """Genera un código QR con información del documento y lo guarda."""
+        # Información que irá en el QR (personalizable)
+        qr_data = f"Documento ID: {self.id}\nTipo: {self.tipo_documento.nombre}\nIdentificación: {self.identificacion or 'Sin identificación'}\nFecha: {self.fecha_hora_recepcion}\nEnlace: {self.enlace_drive}"
+
+        # Crear el código QR
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+
+        # Generar la imagen del QR
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+
+        # Definir la ruta de guardado
+        qr_filename = f"qr_documento_{self.id}.png"
+        qr_path = os.path.join(settings.MEDIA_ROOT, 'qr_codes', qr_filename)
+
+        # Asegurarse de que el directorio existe
+        os.makedirs(os.path.dirname(qr_path), exist_ok=True)
+
+        # Eliminar el QR anterior si existe
+        if self.qr_code and os.path.isfile(self.qr_code.path):
+            os.remove(self.qr_code.path)
+
+        # Guardar la nueva imagen
+        qr_image.save(qr_path)
+
+        # Actualizar el campo qr_code con la ruta relativa
+        self.qr_code = os.path.join('qr_codes', qr_filename)
+
+    def save(self, *args, **kwargs):
+        # Guardar primero para asegurar que el objeto tenga un ID y los campos estén actualizados
+        super().save(*args, **kwargs)
+
+        # Generar o regenerar el QR después de guardar
+        self.generate_qr_code()
+
+        # Guardar nuevamente para actualizar el campo qr_code
+        super().save(update_fields=['qr_code'])
 
     def __str__(self):
         return f"Documento {self.id} - {self.identificacion}"
