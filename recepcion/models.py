@@ -21,7 +21,7 @@ class TipoDocumento(models.Model):
     sigla = models.CharField(max_length=255, verbose_name="Sigla del Tipo de Documento", blank=True)
 
     def __str__(self):
-        return f"{self.nombre} ({self.sigla})"
+        return f"{self.sigla}"
     
     class Meta:
         verbose_name = "Tipo de Documento"
@@ -109,7 +109,7 @@ class Documento(models.Model):
         super().save(update_fields=['qr_code'])
 
     def __str__(self):
-        return f"Documento {self.id} - {self.identificacion}"
+        return f"{self.tipo_documento.sigla}: {self.identificacion}"
 
     class Meta:
         verbose_name = "Documento"
